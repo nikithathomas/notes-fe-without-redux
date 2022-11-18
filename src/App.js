@@ -3,7 +3,6 @@ import { useState, useEffect, useRef } from 'react'
 import Notification from './components/Notification'
 import Footer from './components/Footer'
 import noteService from './services/notes'
-import loginService from './services/login'
 import Togglable from './components/Togglable'
 import Notes from './components/Notes'
 import LoginForm from './components/LoginForm'
@@ -11,10 +10,7 @@ import NotesForm from './components/NotesForm'
 
 const App = () => {
   const [notes, setNotes] = useState([])
-  const [showAll, setShowAll] = useState(true)
   const [errorMessage, setErrorMessage] = useState(null)
-  const [username, setUsername] = useState('')
-  const [password, setPassword] = useState('')
   const [user, setUser] = useState(null)
   const noteFormRef = useRef()
 
@@ -33,24 +29,8 @@ const App = () => {
     }
   }, [])
 
-  const handleLogin = async (event) => {
-    event.preventDefault()
-    try {
-      const user = await loginService.login({
-        username,
-        password,
-      })
-      setUser(user)
-      noteService.setToken(user.jwtToken)
-      window.localStorage.setItem('loggedNoteappUser', JSON.stringify(user))
-      setUsername('')
-      setPassword('')
-    } catch (exception) {
-      setErrorMessage('wrong credentials')
-      setTimeout(() => {
-        setErrorMessage(null)
-      }, 5000)
-    }
+  const handleLogin = async (user) => {
+    setUser(user)
   }
 
   const addNote = async (newNote) => {
@@ -66,28 +46,14 @@ const App = () => {
     setNotes(notes.concat(savedNote))
     return savedNote
   }
-
-  const toggleImportanceOf = (id) => {
-    const note = notes.find((n) => n.id === id)
-    const changedNote = { ...note, important: !note.important }
-
-    noteService
-      .update(id, changedNote)
-      .then((returnedNote) => {
-        setNotes(notes.map((note) => (note.id !== id ? note : returnedNote)))
-      })
-      .catch(() => {
-        setErrorMessage(
-          `Note '${note.content}' was already removed from server`
-        )
-        setTimeout(() => {
-          setErrorMessage(null)
-        }, 5000)
-        setNotes(notes.filter((n) => n.id !== id))
-      })
+  const handleErrors = (errorMsg) => {
+    if (errorMsg.length) {
+      setErrorMessage(errorMsg)
+      setTimeout(() => {
+        setErrorMessage(null)
+      }, 5000)
+    }
   }
-
-  const notesToShow = showAll ? notes : notes.filter((note) => note.important)
 
   return (
     <div>
@@ -97,13 +63,7 @@ const App = () => {
       <div>
         {user === null ? (
           <Togglable buttonLabel="Login">
-            <LoginForm
-              username={username}
-              password={password}
-              handleLogin={handleLogin}
-              handleUsernameChange={(event) => setUsername(event.target.value)}
-              handlePasswordChange={(event) => setPassword(event.target.value)}
-            />
+            <LoginForm handleLogin={handleLogin} handleErrors={handleErrors} />
           </Togglable>
         ) : (
           <div>
@@ -112,10 +72,9 @@ const App = () => {
               <NotesForm createNewNote={addNote} />
             </Togglable>
             <Notes
-              handleShowAll={() => setShowAll(!showAll)}
-              showAll={showAll}
-              notesToShow={notesToShow}
-              handleToggleImportanceOf={toggleImportanceOf}
+              handleErrors={handleErrors}
+              notes={notes}
+              handleUpdateNotes={(updatedNotes) => setNotes(updatedNotes)}
             ></Notes>
           </div>
         )}
